@@ -1,22 +1,21 @@
-# Placeholder — replace with your app's Dockerfile. Contract: linux/amd64,
-# listen on the manifest port, answer the manifest healthcheck with 200
-# within 30s, log to stdout, run unprivileged.
-#
-# nginx-unprivileged already runs as a non-root user and listens on 8080,
-# matching this template's app-manifest.yaml (port: 8080, healthcheck: /healthz).
-FROM nginxinc/nginx-unprivileged:alpine
+# Zero-dependency Node.js JSON API. No npm install needed (no runtime deps),
+# so the image is just the current slim Node base plus source files.
+FROM node:22-alpine
 
-# Build-time writes need root; the base image's default user can't write here.
-USER root
 # apk upgrade: official base images lag CVE fixes by days, and the Trivy gate
-# fails on fixable HIGH/CRITICAL vulns (it caught CVE-2026-33630 in c-ares in
-# a current image). Keep this line — it's what "current base image" means.
-RUN apk upgrade --no-cache \
-    && echo "ok" > /usr/share/nginx/html/healthz \
-    && echo "hello from flightdeck" > /usr/share/nginx/html/index.html
+# fails on fixable HIGH/CRITICAL vulns. Keep this line current at build time.
+RUN apk upgrade --no-cache
 
-# Explicit non-root user: the Trivy gate (DS002, HIGH) checks the Dockerfile
-# itself and can't see that the base image already switches users.
-USER nginx
+WORKDIR /app
 
+COPY package.json ./
+COPY server.js ./
+
+ENV PORT=8080
 EXPOSE 8080
+
+# node:22-alpine already ships a non-root "node" user (uid 1000); use it
+# explicitly so the Dockerfile itself satisfies the non-root scan check.
+USER node
+
+CMD ["node", "server.js"]
