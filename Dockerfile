@@ -6,6 +6,15 @@ FROM node:22-alpine
 # fails on fixable HIGH/CRITICAL vulns. Keep this line current at build time.
 RUN apk upgrade --no-cache
 
+# This app has zero runtime npm dependencies (plain node:http, node:crypto),
+# so npm/npx/corepack are dead weight — and the npm CLI node:22-alpine ships
+# bundles its own vulnerable transitive deps (e.g. picomatch, sigstore) that
+# trip the Trivy HIGH/CRITICAL gate even though nothing in this image ever
+# invokes npm. Remove them rather than chase CVEs in code we never run.
+RUN rm -rf /usr/local/lib/node_modules/npm \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+    /opt/yarn*
+
 WORKDIR /app
 
 COPY package.json ./
